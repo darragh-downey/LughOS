@@ -1,0 +1,52 @@
+name: LughOS Build and Analysis
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc g++ binutils nasm gcc-arm-none-eabi binutils-arm-none-eabi
+          sudo apt-get install -y gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
+          sudo apt-get install -y cmake make git cppcheck
+
+      - name: Install i686-elf-gcc
+        run: |
+          wget https://github.com/lordmilko/i686-elf-tools/releases/download/7.1.0/i686-elf-tools-linux.tar.gz
+          tar -xzf i686-elf-tools-linux.tar.gz
+          echo "$(pwd)/i686-elf-tools-linux/bin" >> $GITHUB_PATH
+
+      - name: Build and install NNG
+        run: |
+          git clone https://github.com/nanomsg/nng.git
+          cd nng
+          mkdir build && cd build
+          cmake -G "Unix Makefiles" ..
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
+
+      - name: Run static analysis with Cppcheck
+        run: |
+          cppcheck --enable=all --error-exitcode=1 --suppress=missingIncludeSystem \
+            kernel/*.c services/scheduler/*.c services/storage/*.c tests/*.c
+
+      - name: Build for x86
+        run: make x86
+
+      - name: Build for ARM
+        run: make arm
+
+      - name: Build for RISC-V
+        run: make riscv
+
+      - name: Run unit tests
+        run: make test
