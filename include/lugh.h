@@ -1,11 +1,21 @@
 #ifndef LUGHOS_H
 #define LUGHOS_H
 
-#include <nng/nng.h>
+/* Use standard headers for types */
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <stdarg.h>
+
+/* Define NULL if not already defined */
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
+/* Variable arguments (for printf-like functions) */
+typedef __builtin_va_list va_list;
+#define va_start(v,l) __builtin_va_start(v,l)
+#define va_end(v)     __builtin_va_end(v)
+#define va_arg(v,l)   __builtin_va_arg(v,l)
 
 /* System constants */
 #define OS_NAME "LughOS"
@@ -52,8 +62,9 @@ typedef enum {
 /* Task structure for scheduler */
 typedef struct {
     uint32_t task_id;
-    int priority; /* 0 (highest) to 10 (lowest) */
-    uint64_t state; /* TASK_READY, TASK_RUNNING, TASK_BLOCKED, TASK_TERMINATED */
+    int priority;      /* 0 (highest) to 10 (lowest) */
+    uint32_t _padding1;/* Explicit padding per CERT DCL39-C */
+    uint64_t state;    /* TASK_READY, TASK_RUNNING, TASK_BLOCKED, TASK_TERMINATED */
     uint64_t deadline; /* For future real-time scheduling */
 } task_t;
 
@@ -67,8 +78,10 @@ typedef enum {
 /* Message structure for prioritized IPC */
 typedef struct {
     msg_priority_t priority;
-    uint32_t operation; /* OP_SCHEDULE, OP_GRID_ALERT, etc. */
-    char payload[MAX_MSG_SIZE];
+    uint32_t operation;             /* OP_SCHEDULE, OP_GRID_ALERT, etc. */
+    uint32_t checksum;              /* Integrity check per NASA Power of Ten rule 6 */
+    uint32_t _padding1;             /* Explicit padding per CERT DCL39-C */
+    char payload[MAX_MSG_SIZE];     /* Always terminated with '\0' per CERT STR31-C */
 } message_t;
 
 /* Priority queue for messages */
@@ -93,21 +106,44 @@ typedef struct {
 /* Transaction log entry for updates */
 typedef struct {
     uint64_t txn_id;
-    char key[64];
-    char value[256];
-    int operation; /* OP_WRITE, OP_DELETE, etc. */
+    char key[64];             /* Always terminated with '\0' per CERT STR31-C */
+    char value[256];          /* Always terminated with '\0' per CERT STR31-C */
+    int operation;            /* OP_WRITE, OP_DELETE, etc. */
+    uint32_t checksum;        /* Integrity check per NASA Power of Ten rule 6 */
+    uint8_t _padding[4];      /* Explicit padding per CERT DCL39-C to ensure 8-byte alignment */
 } txn_log_entry_t;
+
+/* Memory safety functions */
+void* memcpy(void* dest, const void* src, size_t n);
+void* memmove(void* dest, const void* src, size_t n);
+void* memset(void* s, int c, size_t n);
+size_t strlen(const char* s);
+int strcmp(const char* s1, const char* s2);
+char* strcpy(char* dest, const char* src);
+char* strstr(const char* haystack, const char* needle);
+void* kmalloc(size_t size);
+void kfree(void* ptr);
+
+/* IO port functions */
+void outb(uint16_t port, uint8_t val);
+uint8_t inb(uint16_t port);
 
 /* Function prototypes */
 void queue_init(priority_queue_t* queue);
 int queue_push(priority_queue_t* queue, message_t* msg);
 int queue_pop(priority_queue_t* queue, message_t* msg);
+
+/* Data integrity functions per NASA Power of Ten rule 6 */
+uint32_t calculate_checksum(const void* data, size_t len);
 int log_message_transaction(message_t* msg);
 int log_transaction(txn_log_entry_t* entry);
 int commit_transaction(uint64_t txn_id);
 int rollback_transaction(uint64_t txn_id);
-void scheduler_service(nng_socket socket, scheduler_ops_t* ops);
+void scheduler_service(void* socket, scheduler_ops_t* ops);
 void log_message(log_level_t level, const char* format, ...);
 uint64_t generate_txn_id(void);
+uint64_t generate_secure_id(void);
+void process_events(void);
+void cpu_idle(void);
 
 #endif /* LUGHOS_H */

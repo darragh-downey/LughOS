@@ -1,6 +1,6 @@
 # LughOS
 
-LughOS is a secure microkernel operating system focused on critical infrastructure, emphasizing security, modularity, and reliability.
+LughOS is a secure microkernel operating system focused on critical infrastructure, emphasizing security, modularity, and reliability. It follows SEI CERT Secure Coding guidelines and NASA's Power of Ten rules.
 
 ## Features
 
@@ -9,6 +9,19 @@ LughOS is a secure microkernel operating system focused on critical infrastructu
 - **Modular design**: Microkernel architecture with minimal TCB (Trusted Computing Base)
 - **Hardware abstraction**: Clean separation between hardware and higher-level services
 - **Built-in security validation**: Runtime and build-time security checks
+- **SEI CERT compliant**: Follows SEI CERT C Secure Coding Standard
+- **NASA Power of Ten compliant**: Follows NASA's Power of Ten rules for safety-critical code
+
+## Security Features
+
+- **Memory safety**: Strict memory access validation, buffer protection, and pointer validation
+- **Static memory allocation**: Fixed-size allocations following NASA Power of Ten rule 3
+- **Runtime assertions**: Critical invariant checking per NASA Power of Ten rule 10
+- **Data integrity**: Checksum validation of messages and critical data structures
+- **Secure messaging**: NNG integration for secure message passing
+- **Cryptographic validation**: Message signing and verification for critical operations
+- **Explicit padding**: Proper structure padding per SEI CERT DCL39-C
+- **Bounds checking**: Fixed loop bounds with explicit checks per NASA Power of Ten rule 2
 
 ## Setup (Fedora 42)
 

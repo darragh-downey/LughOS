@@ -4,18 +4,23 @@ X86_CC = i686-elf-gcc
 X86_LD = i686-elf-ld
 ARM_CC = arm-none-eabi-gcc
 ARM_LD = arm-none-eabi-ld
-# Security-focused compiler flags
+# Security-focused compiler flags per SEI CERT and NASA Power of Ten
 CFLAGS = -ffreestanding -nostdlib -Wall -Wextra -Werror -Wformat=2 -Wformat-security \
-         -fno-stack-protector -fPIE \
+         -fPIE -fno-strict-aliasing \
          -fdata-sections -ffunction-sections \
-         -D_FORTIFY_SOURCE=2 -Iinclude -Ilib/nng/include -O2
+         -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wredundant-decls \
+         -Wconversion -Wno-unused-parameter \
+         -DDEBUG -D_FORTIFY_SOURCE=2 -Iinclude -Ilib/nng/include -O2
+# commented out for the time being -fstack-protector-strong
 # Comment out for now as it's incompatible with our cross-compiler
 # LIBS = lib/nng/lib/libnng.a
 LIBS =
 X86_LDFLAGS = -T kernel/linker_x86.ld
 ARM_LDFLAGS = -T kernel/linker_arm.ld
 
-KERNEL_SRC = kernel/main.c kernel/ipc.c kernel/task.c kernel/memory.c kernel/log.c kernel/security.c kernel/hardware.c
+KERNEL_SRC = kernel/main.c kernel/ipc.c kernel/task.c kernel/memory.c kernel/memory_utils.c \
+              kernel/log.c kernel/security.c kernel/hardware.c kernel/nngcompat.c kernel/crypto.c \
+              kernel/assert.c
 SCHEDULER_SRC = services/scheduler/round_robin.c services/scheduler/utils.c
 STORAGE_SRC = services/storage/storage.c services/storage/transactions.c
 X86_BOOT_SRC = kernel/boot_x86.S

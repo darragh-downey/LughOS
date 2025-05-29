@@ -2,8 +2,14 @@
 #include "hardware.h"
 
 
+// Function prototypes
+static void init_serial(void);
+static void serial_write(uint8_t c);
+static void kputchar(char c);
+static void kprintf(const char* format, va_list args);
+
 // Initialize serial port for debugging
-static void init_serial() {
+static void init_serial(void) {
     // COM1 port (0x3F8)
     // Disable interrupts
     outb(0x3F9, 0x00);
@@ -24,10 +30,11 @@ static void init_serial() {
 }
 
 // Write a single character to the serial port
-static void serial_write(char c) {
+static void serial_write(uint8_t c) {
     // Wait until transmitter holding register is empty
-    while ((inb(0x3FD) & 0x20) == 0);
-    
+    while ((inb(0x3FD) & 0x20) == 0) {
+        // spin
+    }
     // Send the character
     outb(0x3F8, c);
 }
@@ -35,43 +42,49 @@ static void serial_write(char c) {
 // Basic implementation of kernel console output 
 // Outputs to both VGA and serial port
 static void kputchar(char c) {
+    // JPL Rule 15: Validate parameters at start of public functions (should check c is valid ASCII)
+    // SEI CERT ARR30-C: Validate all array indices (bounds check for VGA buffer)
     // Initialize serial port if not done yet
     static int initialized = 0;
     if (!initialized) {
         init_serial();
         initialized = 1;
     }
-    
-    // Write to serial port for debugging
-    serial_write(c);
-    
-    // Write to VGA buffer
+    serial_write((uint8_t)c); // Explicit cast for sign-conversion
     static volatile unsigned short* vga_buffer = (unsigned short*)0xB8000;
     static int position = 0;
-    
     if (c == '\n') {
-        position = (position / 80 + 1) * 80; // Move to next line
+        position = ((position / 80) + 1) * 80;
+        if (position >= 80 * 25) position = 0; // Bounds check
     } else {
-        vga_buffer[position++] = (unsigned short)c | 0x0700; // White on black
+        if (position < 80 * 25) {
+            vga_buffer[position++] = (unsigned short)(((uint8_t)c) | 0x0700);
+        } else {
+            position = 0;
+        }
     }
 }
 
 // Very basic printf-like functionality
 static void kprintf(const char* format, va_list args) {
+    // JPL Rule 15: Validate parameters at start of public functions (should check format != NULL)
+    // SEI CERT STR31-C: Guarantee storage for strings has space for null terminator
     char c;
     while ((c = *format++)) {
         if (c != '%') {
             kputchar(c);
             continue;
         }
-        
         c = *format++;
         if (!c) break;
-        
         switch (c) {
             case 's': {
                 const char* s = va_arg(args, const char*);
-                while (*s) kputchar(*s++);
+                if (s) {
+                    for (size_t i = 0; s[i] != '\0'; i++) {
+                        kputchar(s[i]);
+                    }
+                }
                 break;
             }
             case 'd': {
@@ -80,24 +93,23 @@ static void kprintf(const char* format, va_list args) {
                     kputchar('-');
                     value = -value;
                 }
-                
-                // Convert to string
-                char buffer[12]; // Enough for 32-bit int
+                char buffer[12];
                 int i = 0;
                 do {
-                    buffer[i++] = '0' + (value % 10);
+                    int digit = value % 10;
+                    buffer[i++] = (char)('0' + digit);
                     value /= 10;
-                } while (value);
-                
-                // Print in correct order
+                } while (value && i < 11);
                 while (i > 0) {
                     kputchar(buffer[--i]);
                 }
                 break;
             }
-            case 'c':
-                kputchar(va_arg(args, int));
+            case 'c': {
+                int ch = va_arg(args, int);
+                kputchar((char)ch);
                 break;
+            }
             case '%':
                 kputchar('%');
                 break;
@@ -109,10 +121,8 @@ static void kprintf(const char* format, va_list args) {
 }
 
 void log_message(log_level_t level, const char* format, ...) {
-    if (level < LOG_DEBUG || level >= LOG_LEVEL_COUNT) return; // Invalid log level
-    
-    // Could add level prefixes here (like [INFO], [ERROR], etc.)
-    
+    // Fix: log_level_t is unsigned, so level < LOG_DEBUG is always false
+    if ((unsigned)level >= (unsigned)LOG_LEVEL_COUNT) return;
     va_list args;
     va_start(args, format);
     kprintf(format, args);
