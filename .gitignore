@@ -1,0 +1,47 @@
+# Build artifacts
+build/
+*.o
+*.bin
+*.elf
+*.iso
+*.img
+
+# Generated files
+*.d
+*.map
+
+# Object files
+*.ko
+*.obj
+*.so
+*.lo
+*.la
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Editor files
+*~
+.*.swp
+.*.swo
+*.bak
+.vscode/
+.idea/
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf

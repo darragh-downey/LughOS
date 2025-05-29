@@ -1,17 +1,30 @@
 #include "lugh.h"
-#include <stdio.h>
+#include "security.h"
+#include "hardware.h"
 
-static void print(const char *message) {
-    printf("%s\n", message); // QEMU console 
-}
+extern scheduler_ops_t rr_scheduler;
 
-int kmain(void) {
-    char buf[64];
-    if (snprintf(buf, sizeof(buf), "%s v%s booting...\n", OS_NAME, OS_VERSION) >= (int)sizeof(buf)) {
-        print("Buffer overflow in boot message!");
-        return -1; 
+void kmain(void) {
+    // Initialize essential kernel subsystems
+    log_message(LOG_INFO, "%s v%s booting...\n", OS_NAME, OS_VERSION);
+    
+    // Initialize hardware detection and security features
+    if (!hw_detect()) {
+        log_message(LOG_ERROR, "Hardware detection failed, halting system\n");
+        return;
     }
-    print(buf);
-    while(1) {} // halt the kernel
-    return 0; 
+    
+    // Initialize security subsystem
+    security_init();
+    
+    // Simple microkernel main loop - for now, just idle
+    log_message(LOG_INFO, "Entering kernel main loop\n");
+    
+    while (1) {
+        // Process any pending events
+        process_events();
+        
+        // Idle the CPU to conserve power
+        cpu_idle();
+    }
 }
