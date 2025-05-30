@@ -18,13 +18,27 @@ LIBS =
 X86_LDFLAGS = -T kernel/linker_x86.ld
 ARM_LDFLAGS = -T kernel/linker_arm.ld
 
-KERNEL_SRC = kernel/main.c kernel/ipc.c kernel/task.c kernel/memory.c kernel/memory_utils.c \
-              kernel/log.c kernel/security.c kernel/hardware.c kernel/nngcompat.c kernel/crypto.c \
-              kernel/assert.c
+# Updated kernel source paths for new structure
+KERNEL_SRC = \
+  kernel/main.c \
+  kernel/log.c \
+  kernel/security.c \
+  kernel/hardware.c \
+  kernel/nngcompat.c \
+  kernel/crypto.c \
+  kernel/assert.c \
+  kernel/mm/memory.c \
+  kernel/mm/memory_utils.c \
+  kernel/fs/storage.c \
+  kernel/ipc/ipc.c \
+  kernel/drivers/console.c \
+  kernel/sched/priority.c \
+  kernel/sched/task.c
+
 SCHEDULER_SRC = services/scheduler/round_robin.c services/scheduler/utils.c
 STORAGE_SRC = services/storage/storage.c services/storage/transactions.c
-X86_BOOT_SRC = kernel/boot_x86.S
-ARM_BOOT_SRC = kernel/boot_arm.S
+X86_BOOT_SRC = kernel/arch/x86/boot_x86.S kernel/arch/x86/enter_user_mode.S
+ARM_BOOT_SRC = kernel/arch/arm/boot_arm.S
 
 X86_OBJS = $(KERNEL_SRC:.c=.x86.o) $(SCHEDULER_SRC:.c=.x86.o) $(STORAGE_SRC:.c=.x86.o) $(X86_BOOT_SRC:.S=.x86.o)
 ARM_OBJS = $(KERNEL_SRC:.c=.arm.o) $(SCHEDULER_SRC:.c=.arm.o) $(STORAGE_SRC:.c=.arm.o) $(ARM_BOOT_SRC:.S=.arm.o)
@@ -67,7 +81,7 @@ $(ARM_BIN): $(ARM_OBJS)
 	$(ARM_CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf build *.o kernel/*.o services/*/*.o
+	rm -rf build *.o kernel/*.o kernel/*/*.o kernel/*/*/*.o services/*/*.o
 
 run: x86
 	@echo "Running LughOS x86 in QEMU..."

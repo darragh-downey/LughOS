@@ -145,5 +145,6 @@ uint64_t generate_txn_id(void);
 uint64_t generate_secure_id(void);
 void process_events(void);
 void cpu_idle(void);
+void enter_user_mode(uint32_t user_eip, uint32_t user_esp) __attribute__((noreturn));
 
 #endif /* LUGHOS_H */

@@ -198,3 +198,12 @@ void kmain(void) {
         cpu_idle();
     }
 }
+
+void switch_to_user_mode(uint32_t user_eip, uint32_t user_esp) {
+    if (user_eip == 0 || user_esp == 0) {
+        log_message(LOG_ERROR, "Invalid user mode parameters\n");
+        return;
+    }
+    // Optionally: check that user_eip/user_esp are in user address space
+    enter_user_mode(user_eip, user_esp); // Never returns
+}
