@@ -44,4 +44,11 @@ build/
 modules.order
 Module.symvers
 Mkfile.old
-dkms.confcppcheck-report.txt
+dkms.conf
+
+# Analysis reports
+reports/
+cppcheck-report.txt
+cppcheck-report.xml
+cppcheck-report.html
+clang-tidy-*

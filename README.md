@@ -50,6 +50,48 @@ Build for ARM platform:
 make arm
 ```
 
+Build for RISC-V platform:
+
+```bash
+make riscv
+```
+
+### Testing
+
+Run all tests:
+
+```bash
+make test
+```
+
+Run security checks:
+
+```bash
+make security-check
+```
+
+Run static analysis:
+
+```bash
+make analyze
+```
+
+Run complete CI pipeline locally:
+
+```bash
+make ci
+```
+
+## Continuous Integration
+
+LughOS uses GitHub Actions for CI/CD with the following workflows:
+
+- **Build Workflow**: Compiles for all supported architectures and runs basic tests
+- **Matrix Build**: Builds for multiple architectures in parallel
+- **Static Analysis**: Performs CERT C compliance checks and code quality analysis
+
+See [CI/CD Documentation](docs/ci_cd.md) for more details.
+
 Build both:
 
 ```bash

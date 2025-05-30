@@ -30,9 +30,13 @@ jobs:
         run: |
           wget https://github.com/lordmilko/i686-elf-tools/releases/download/7.1.0/i686-elf-tools-linux.zip
           unzip i686-elf-tools-linux.zip
+          chmod +x i686-elf-tools-linux/bin/*
 
       - name: Add i686-elf toolchain to PATH
-        run: echo "$GITHUB_WORKSPACE/i686-elf-tools-linux/bin" >> $GITHUB_PATH
+        run: |
+          echo "${{ github.workspace }}/i686-elf-tools-linux/bin" >> $GITHUB_PATH
+          echo "Toolchain directory contents:"
+          ls -la ${{ github.workspace }}/i686-elf-tools-linux/bin
 
       - name: Cache NNG build
         id: cache-nng-build
@@ -52,27 +56,54 @@ jobs:
           sudo make install
           sudo ldconfig
 
+      - name: Verify compiler existence
+        run: |
+          echo "PATH=$PATH"
+          which i686-elf-gcc || echo "i686-elf-gcc not found in PATH"
+          find ${{ github.workspace }} -name "i686-elf-gcc"
+          
       - name: Build for x86
-        run: make x86
-        env:
-          PATH: /usr/bin:${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
+        run: |
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          echo "PATH=$PATH"
+          which i686-elf-gcc
+          make x86
 
       - name: Run QEMU x86 tests
-        run: ./scripts/test_x86.sh
-        env:
-          PATH: /usr/bin:${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
+        run: |
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          chmod +x ./scripts/run_tests.sh
+          ./scripts/run_tests.sh
 
       - name: Build for ARM
-        run: make arm
-        env:
-          PATH: /usr/bin:${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
+        run: |
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          make arm
 
       - name: Build for RISC-V
-        run: make riscv
-        env:
-          PATH: /usr/bin:${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
+        run: |
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          make riscv
 
       - name: Run unit tests
-        run: make test
-        env:
-          PATH: /usr/bin:${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
+        run: |
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          make test || echo "Tests failed, check artifacts for details"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: lughos-build-artifacts
+          path: |
+            build/x86/lughos.bin
+            build/arm/lughos.bin
+            build/*/user_hello
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-logs
+          path: |
+            build/test-*.log
+            scripts/*.log

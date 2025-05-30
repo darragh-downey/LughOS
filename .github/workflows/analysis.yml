@@ -18,10 +18,33 @@ jobs:
 
       - name: Run static analysis with clang-tidy (CERT C)
         run: |
-          clang-tidy "-checks=cert-*" kernel/*.c -- -Iinclude || true
+          mkdir -p reports
+          clang-tidy "-checks=cert-*,clang-analyzer-security.*,clang-analyzer-core.*" \
+            kernel/*.c kernel/*/*.c kernel/*/*/*.c services/*/*.c \
+            -export-fixes=reports/clang-tidy-fixes.yaml \
+            -- -Iinclude || true
+          echo "See clang-tidy-fixes.yaml for issues found"
 
       - name: Run static analysis with Cppcheck
         run: |
+          mkdir -p reports
           cppcheck --enable=all --suppress=missingIncludeSystem \
+            --xml --xml-version=2 \
             -Iinclude \
-            kernel/*.c services/scheduler/*.c services/storage/*.c
+            kernel/*.c kernel/*/*.c kernel/*/*/*.c \
+            services/scheduler/*.c services/storage/*.c services/update/*.c \
+            2> reports/cppcheck-report.xml
+          echo "Cppcheck analysis completed, see reports/cppcheck-report.xml for details"
+
+      - name: Generate HTML report from Cppcheck XML
+        run: |
+          sudo apt-get install -y xsltproc
+          xsltproc --stringparam title "LughOS Cppcheck Report" \
+            /usr/share/cppcheck/cppcheck-htmlreport.xslt \
+            reports/cppcheck-report.xml > reports/cppcheck-report.html
+
+      - name: Upload analysis reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: static-analysis-reports
+          path: reports/

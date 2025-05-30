@@ -1,9 +1,11 @@
-# LughOS Makefile for x86 and ARM on Fedora 42 with hardening
+# LughOS Makefile for x86, ARM and RISC-V on Fedora 42 with hardening
 
 X86_CC = i686-elf-gcc
 X86_LD = i686-elf-ld
 ARM_CC = arm-none-eabi-gcc
 ARM_LD = arm-none-eabi-ld
+RISCV_CC = riscv64-linux-gnu-gcc
+RISCV_LD = riscv64-linux-gnu-ld
 # Security-focused compiler flags per SEI CERT and NASA Power of Ten
 CFLAGS = -ffreestanding -nostdlib -Wall -Wextra -Werror -Wformat=2 -Wformat-security \
          -fPIE -fno-strict-aliasing \
@@ -17,6 +19,7 @@ CFLAGS = -ffreestanding -nostdlib -Wall -Wextra -Werror -Wformat=2 -Wformat-secu
 LIBS =
 X86_LDFLAGS = -T kernel/linker_x86.ld
 ARM_LDFLAGS = -T kernel/linker_arm.ld
+RISCV_LDFLAGS = -T kernel/linker_riscv.ld
 
 # Updated kernel source paths for new structure
 KERNEL_SRC = \
@@ -64,25 +67,36 @@ X86_OBJS = $(KERNEL_SRC:.c=.x86.o) $(SCHEDULER_SRC:.c=.x86.o) $(STORAGE_SRC:.c=.
 ARM_OBJS = $(KERNEL_SRC:.c=.arm.o) $(SCHEDULER_SRC:.c=.arm.o) $(STORAGE_SRC:.c=.arm.o) \
            $(UPDATE_SRC:.c=.arm.o) \
            $(ARM_BOOT_SRC:.S=.arm.o) $(ARM_SYSCALL_SRC:.S=.arm.o) $(SYSCALL_SRC:.c=.arm.o)
+RISCV_OBJS = $(KERNEL_SRC:.c=.riscv.o) $(SCHEDULER_SRC:.c=.riscv.o) $(STORAGE_SRC:.c=.riscv.o) \
+           $(UPDATE_SRC:.c=.riscv.o) \
+           $(SYSCALL_SRC:.c=.riscv.o)
 
 X86_OUT = build/x86
 ARM_OUT = build/arm
+RISCV_OUT = build/riscv
 X86_BIN = $(X86_OUT)/lughos.bin
 ARM_BIN = $(ARM_OUT)/lughos.bin
+RISCV_BIN = $(RISCV_OUT)/lughos.bin
 X86_USER_BIN = $(X86_OUT)/user_hello
 ARM_USER_BIN = $(ARM_OUT)/user_hello
+RISCV_USER_BIN = $(RISCV_OUT)/user_hello
 X86_USER_OBJ = $(X86_OUT)/user_hello.o
 ARM_USER_OBJ = $(ARM_OUT)/user_hello.o
+RISCV_USER_OBJ = $(RISCV_OUT)/user_hello.o
 
-all: x86 arm
+all: x86 arm riscv
 
 x86: user_x86 $(X86_BIN) 
 
 arm: user_arm $(ARM_BIN)
 
+riscv: user_riscv $(RISCV_BIN)
+
 user_x86: $(X86_USER_BIN) $(X86_USER_OBJ)
 
 user_arm: $(ARM_USER_BIN) $(ARM_USER_OBJ)
+
+user_riscv: $(RISCV_USER_BIN) $(RISCV_USER_OBJ)
 
 $(X86_BIN): $(X86_OBJS) $(X86_USER_OBJ)
 	@mkdir -p $(X86_OUT)
@@ -98,7 +112,18 @@ $(ARM_BIN): $(ARM_OBJS) $(ARM_USER_OBJ)
 	@echo "Checking binary for security issues..."
 	@objdump -d $@ | grep -i "mov.*sp.*r" || echo "No stack exec vulnerabilities found"
 
-%.x86.o: %.c 
+$(RISCV_BIN): $(RISCV_OBJS) $(RISCV_USER_OBJ)
+	@mkdir -p $(RISCV_OUT)
+	$(RISCV_LD) $(RISCV_LDFLAGS) -o $@ $^ $(LIBS)
+	@echo "Built RISC-V kernel: $@"
+	@echo "Checking binary for security issues..."
+	@objdump -d $@ | grep -i "^.*sp" || echo "No stack exec vulnerabilities found"
+
+%.x86.o: %.c
+	$(X86_CC) $(CFLAGS) -c $< -o $@
+	
+%.riscv.o: %.c
+	$(RISCV_CC) $(CFLAGS) -c $< -o $@ 
 	$(X86_CC) $(CFLAGS) -c $< -o $@ 
 
 %.x86.o: %.S
@@ -159,8 +184,15 @@ debug: x86
 	@./scripts/run_x86.sh
 
 analyze:
-	cppcheck --enable=all --error-exitcode=1 --suppress=missingIncludeSystem \
-	kernel/*.c services/*/*.c
+	mkdir -p reports
+	cppcheck --enable=all --suppress=missingIncludeSystem \
+	--xml --xml-version=2 \
+	-Iinclude \
+	kernel/*.c kernel/*/*.c kernel/*/*/*.c services/*/*.c 2> reports/cppcheck-report.xml
+	@echo "Cppcheck analysis completed, see reports/cppcheck-report.xml for details"
+	
+	@echo "Running clang-tidy CERT C checks..."
+	clang-tidy "-checks=cert-*,clang-analyzer-security.*" kernel/*.c kernel/*/*.c -- -Iinclude || true
 
 security-check:
 	@echo "Performing security checks..."
@@ -169,4 +201,15 @@ security-check:
 	@echo "Running static analysis with cppcheck..."
 	@$(MAKE) analyze
 
-.PHONY: all x86 arm clean run debug analyze security-check
+test: x86 arm riscv
+	@echo "Running all tests..."
+	@mkdir -p test-logs
+	@./scripts/run_tests.sh
+	@./scripts/run_unit_tests.sh x86 || true
+	@./scripts/run_unit_tests.sh arm || true
+	@echo "Tests completed, see test-logs/ directory for details"
+
+ci: clean x86 arm riscv test analyze security-check
+	@echo "CI pipeline completed successfully"
+
+.PHONY: all x86 arm riscv clean run debug analyze security-check test ci

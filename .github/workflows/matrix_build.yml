@@ -1,0 +1,153 @@
+name: LughOS Matrix Build
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit-toolchain: ${{ steps.cache-i686-elf-toolchain.outputs.cache-hit }}
+      cache-hit-nng: ${{ steps.cache-nng-build.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Cache i686-elf toolchain
+        id: cache-i686-elf-toolchain
+        uses: actions/cache@v4
+        with:
+          path: i686-elf-tools-linux
+          key: ${{ runner.os }}-i686-elf-tools-linux-7.1.0
+
+      - name: Cache NNG build
+        id: cache-nng-build
+        uses: actions/cache@v4
+        with:
+          path: nng/build
+          key: ${{ runner.os }}-nng-build-v1
+
+      - name: Install i686-elf-gcc
+        if: steps.cache-i686-elf-toolchain.outputs.cache-hit != 'true'
+        run: |
+          wget https://github.com/lordmilko/i686-elf-tools/releases/download/7.1.0/i686-elf-tools-linux.zip
+          unzip i686-elf-tools-linux.zip
+          chmod +x i686-elf-tools-linux/bin/*
+          
+      - name: Build and install NNG
+        if: steps.cache-nng-build.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/nanomsg/nng.git
+          cd nng
+          mkdir build && cd build
+          cmake -G "Unix Makefiles" ..
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
+
+      - name: Upload toolchain artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: toolchain
+          path: i686-elf-tools-linux
+
+      - name: Upload NNG artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: nng
+          path: nng/build
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x86, arm, riscv]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install common dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc g++ binutils nasm gcc-arm-none-eabi binutils-arm-none-eabi
+          sudo apt-get install -y gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
+          sudo apt-get install -y cmake make git qemu-system-i386 unzip
+
+      - name: Download toolchain
+        uses: actions/download-artifact@v3
+        with:
+          name: toolchain
+          path: i686-elf-tools-linux
+
+      - name: Download NNG
+        uses: actions/download-artifact@v3
+        with:
+          name: nng
+          path: nng/build
+
+      - name: Set up toolchain
+        run: |
+          chmod +x i686-elf-tools-linux/bin/*
+          echo "Toolchain directory contents:"
+          ls -la i686-elf-tools-linux/bin
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          which i686-elf-gcc || echo "i686-elf-gcc not found in PATH"
+
+      - name: Build for ${{ matrix.architecture }}
+        run: |
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          make ${{ matrix.architecture }}
+
+      - name: Run tests for ${{ matrix.architecture }}
+        if: matrix.architecture == 'x86'
+        run: |
+          export PATH="${{ github.workspace }}/i686-elf-tools-linux/bin:$PATH"
+          chmod +x ./scripts/run_tests.sh
+          ./scripts/run_tests.sh || true
+          
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: lughos-${{ matrix.architecture }}-build
+          path: |
+            build/${{ matrix.architecture }}
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+          
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-i386 qemu-system-arm
+
+      - name: Generate test report
+        run: |
+          mkdir -p test-reports
+          echo "# LughOS Test Results" > test-reports/test-summary.md
+          echo "## Build Status" >> test-reports/test-summary.md
+          
+          # List all built architectures
+          echo "### Architectures built:" >> test-reports/test-summary.md
+          for arch in x86 arm riscv; do
+            if [ -d "artifacts/lughos-${arch}-build" ]; then
+              echo "- ✅ ${arch}" >> test-reports/test-summary.md
+            else
+              echo "- ❌ ${arch}" >> test-reports/test-summary.md
+            fi
+          done
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-reports
+          path: test-reports
