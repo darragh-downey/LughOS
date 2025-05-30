@@ -30,14 +30,16 @@ jobs:
         run: |
           wget https://github.com/lordmilko/i686-elf-tools/releases/download/7.1.0/i686-elf-tools-linux.zip
           unzip i686-elf-tools-linux.zip
-          echo "$(pwd)/i686-elf-tools-linux/bin" >> $GITHUB_PATH
+
+      - name: Add i686-elf toolchain to PATH
+        run: echo "$GITHUB_WORKSPACE/i686-elf-tools-linux/bin" >> $GITHUB_PATH
 
       - name: Cache NNG build
         id: cache-nng-build
         uses: actions/cache@v4
         with:
-          path: nng
-          key: ${{ runner.os }}-nng-${{ hashFiles('**/nng.git/HEAD') }}
+          path: nng/build
+          key: ${{ runner.os }}-nng-build-v1
 
       - name: Build and install NNG
         if: steps.cache-nng-build.outputs.cache-hit != 'true'
