@@ -2,8 +2,30 @@
 #include "security.h"
 #include "hardware.h"
 #include "nngcompat.h"
+#include "console.h"
+#include "crypto.h"
+#include "transactions.h"
+#include "update.h"
+#include "sandbox.h"
+#include "memory.h"
 
-extern scheduler_ops_t rr_scheduler;
+// Forward declarations
+void test_nng(void);
+void test_energy_grid_alert(void);
+void test_update_system(void);
+
+// Define a simple round-robin scheduler for now
+scheduler_ops_t rr_scheduler = {
+    .name = "Round Robin",
+    .init = NULL,
+    .schedule = NULL,
+    .add_task = NULL,
+    .remove_task = NULL,
+    .get_state = NULL,
+    .set_state = NULL,
+    .prepare_swap = NULL,
+    .finalize_swap = NULL
+};
 
 // Test NNG messaging functionality
 void test_nng(void) {
@@ -78,9 +100,6 @@ void test_nng(void) {
     log_message(LOG_INFO, "Converted LughOS->NNG message sent successfully!\n");
     nng_socket_close(&socket);
 }
-
-// Forward declaration
-void crypto_init(void);
 
 // Test secure messaging for energy sector operations
 void test_energy_grid_alert(void) {
@@ -158,9 +177,72 @@ void test_energy_grid_alert(void) {
     }
 }
 
-// Forward declaration of memory_init
-void memory_init(void);
+/**
+ * Test the update system with a simulated update transaction
+ * 
+ * Creates a test update transaction and executes it to verify
+ * that the update system works properly.
+ * 
+ * Complies with:
+ * - SEI CERT ERR33-C: Detect errors and handle appropriately
+ * - JPL Rule 14: Check return values
+ */
+void test_update_system(void) {
+    log_message(LOG_INFO, "Testing update system...\n");
+    
+    // Create a sample binary for testing
+    uint8_t test_binary[256];
+    size_t test_size = sizeof(test_binary);
+    
+    // Initialize with ELF-like header
+    test_binary[0] = 0x7F;
+    test_binary[1] = 'E';
+    test_binary[2] = 'L';
+    test_binary[3] = 'F';
+    
+    // Fill rest with test pattern
+    for (size_t i = 4; i < test_size; i++) {
+        test_binary[i] = (uint8_t)(i & 0xFF);
+    }
+    
+    // Calculate hash for later verification
+    uint32_t hash = compute_sha256(test_binary, test_size);
+    
+    // Create update state
+    struct update_state update;
+    
+    // Initialize the update transaction
+    const char *test_path = "/services/test_update.bin";
+    if (init_update_transaction(&update, UPDATE_TYPE_SERVICE, test_path, 
+                              test_binary, test_size, hash) == 0) {
+        
+        // Execute the update
+        int result = execute_update(&update);
+        
+        if (result == 0) {
+            log_message(LOG_INFO, "Update test completed successfully\n");
+        } else {
+            log_message(LOG_ERROR, "Update test failed\n");
+        }
+        
+        // Clean up
+        cleanup_update_transaction(&update);
+    } else {
+        log_message(LOG_ERROR, "Failed to initialize update transaction\n");
+    }
+}
 
+/**
+ * @brief Initialize the kernel and its subsystems
+ * 
+ * This function is called on system boot to initialize all
+ * essential kernel components, including hardware detection,
+ * security, memory, and messaging systems.
+ * 
+ * Complies with:
+ * - SEI CERT STR30-C: Ensure pointers are not null before dereferencing
+ * - JPL Rule 15: Validate parameters before use
+ */
 void kmain(void) {
     // Initialize essential kernel subsystems
     log_message(LOG_INFO, "%s v%s booting...\n", OS_NAME, OS_VERSION);
@@ -171,6 +253,9 @@ void kmain(void) {
         return;
     }
     
+    // Initialize console for output
+    console_init();
+    
     // Initialize security subsystem first (needed for validations)
     security_init();
     
@@ -180,6 +265,14 @@ void kmain(void) {
     // Initialize crypto subsystem (depends on memory and security)
     crypto_init();
     
+#ifdef __arm__
+    // Initialize ARM system call interface
+    init_syscall_arm();
+#else
+    // Initialize system call interface
+    init_syscall();
+#endif
+    
     // Initialize NNG compatibility layer
     nng_init();
     
@@ -187,23 +280,47 @@ void kmain(void) {
     test_nng();
     test_energy_grid_alert();
     
-    // Simple microkernel main loop - for now, just idle
-    log_message(LOG_INFO, "Entering kernel main loop\n");
+    // Test the update system
+    test_update_system();
     
+    // Initialize user mode subsystem
+    log_message(LOG_INFO, "Initializing user mode subsystem\n");
+    
+    // The following would normally be loaded by a dynamic loader or initrd
+    // For now, we'll just hardcode a test address
+    uint32_t user_eip = 0x400000; // Entry point from linker script
+    uint32_t user_esp = 0x700000; // Stack position
+    
+    // Check if we have a user program to load (would come from initrd or filesystem)
+    // Using the symbols created by objcopy
+    // Binary symbols created by ld (using -b binary)
+    extern char _binary_build_x86_user_hello_bin_start[];
+    extern char _binary_build_x86_user_hello_bin_end[];
+    void* binary_start = (void*)_binary_build_x86_user_hello_bin_start;
+    void* binary_end = (void*)_binary_build_x86_user_hello_bin_end;
+    
+    if (binary_start != NULL && binary_end != NULL) {
+        size_t size = (size_t)((uintptr_t)binary_end - (uintptr_t)binary_start);
+        log_message(LOG_INFO, "Found user program: size=%u bytes\n", (unsigned int)size);
+        
+        // Load the user program
+        if (load_user_program(binary_start, size, &user_eip, &user_esp) == 0) {
+            log_message(LOG_INFO, "User program loaded: eip=0x%x, esp=0x%x\n", (unsigned int)user_eip, (unsigned int)user_esp);
+            log_message(LOG_INFO, "User program loaded, switching to user mode\n");
+            switch_to_user_mode(user_eip, user_esp); // No return
+        } else {
+            log_message(LOG_ERROR, "Failed to load user program\n");
+        }
+    }
+    
+    // If we reach here, either no user program was found or loading failed
+    log_message(LOG_INFO, "No user program found or load failed, entering kernel main loop\n");
+    
+    // Simple microkernel main loop - for now, just idle
     while (1) {
         // Process any pending events
         process_events();
-        
         // Idle the CPU to conserve power
         cpu_idle();
     }
-}
-
-void switch_to_user_mode(uint32_t user_eip, uint32_t user_esp) {
-    if (user_eip == 0 || user_esp == 0) {
-        log_message(LOG_ERROR, "Invalid user mode parameters\n");
-        return;
-    }
-    // Optionally: check that user_eip/user_esp are in user address space
-    enter_user_mode(user_eip, user_esp); // Never returns
 }

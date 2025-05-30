@@ -46,6 +46,7 @@ typedef __builtin_va_list va_list;
 #define OP_SCHEDULE 0x02
 #define OP_GRID_ALERT 0x100 /* Critical infrastructure: energy grid fault */
 #define OP_HEARTBEAT 0x101  /* Future: distributed operation */
+#define OP_UPDATE 0x102     /* System update operation */
 #define OP_WRITE 0x200
 #define OP_DELETE 0x201
 
@@ -135,10 +136,11 @@ int queue_pop(priority_queue_t* queue, message_t* msg);
 
 /* Data integrity functions per NASA Power of Ten rule 6 */
 uint32_t calculate_checksum(const void* data, size_t len);
-int log_message_transaction(message_t* msg);
-int log_transaction(txn_log_entry_t* entry);
-int commit_transaction(uint64_t txn_id);
-int rollback_transaction(uint64_t txn_id);
+// moved to transactions.h
+// int log_message_transaction(message_t* msg);
+// int log_transaction(txn_log_entry_t* entry);
+// int commit_transaction(uint64_t txn_id);
+// int rollback_transaction(uint64_t txn_id);
 void scheduler_service(void* socket, scheduler_ops_t* ops);
 void log_message(log_level_t level, const char* format, ...);
 uint64_t generate_txn_id(void);
@@ -146,5 +148,24 @@ uint64_t generate_secure_id(void);
 void process_events(void);
 void cpu_idle(void);
 void enter_user_mode(uint32_t user_eip, uint32_t user_esp) __attribute__((noreturn));
+
+/* User mode functions */
+void switch_to_user_mode(uint32_t user_eip, uint32_t user_esp);
+
+// moved to memory.h
+// int load_user_program(const void* binary_ptr, size_t size, uint32_t* eip, uint32_t* esp);
+
+/* Initialize system call mechanism */
+void init_syscall(void);
+void init_syscall_arm(void);
+
+/* System call definitions */
+#define SYS_WRITE    1    /* Write to console */
+#define SYS_IPC_SEND 2    /* Send IPC message */
+#define SYS_EXIT     3    /* Exit program */
+
+#ifdef __KERNEL__
+void syscall_handler(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+#endif
 
 #endif /* LUGHOS_H */

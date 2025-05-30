@@ -33,35 +33,65 @@ KERNEL_SRC = \
   kernel/ipc/ipc.c \
   kernel/drivers/console.c \
   kernel/sched/priority.c \
-  kernel/sched/task.c
+  kernel/sched/task.c \
+  kernel/user.c \
+  kernel/arch/x86/init.c \
+  kernel/arch/arm/init.c
 
 SCHEDULER_SRC = services/scheduler/round_robin.c services/scheduler/utils.c
 STORAGE_SRC = services/storage/storage.c services/storage/transactions.c
+UPDATE_SRC = services/update/update.c services/update/sandbox.c
 X86_BOOT_SRC = kernel/arch/x86/boot_x86.S kernel/arch/x86/enter_user_mode.S
-ARM_BOOT_SRC = kernel/arch/arm/boot_arm.S
+ARM_BOOT_SRC = kernel/arch/arm/boot_arm.S kernel/arch/arm/enter_user_mode.S
+X86_SYSCALL_SRC = kernel/arch/x86/syscall.S
+ARM_SYSCALL_SRC = kernel/arch/arm/syscall.S
+SYSCALL_SRC = kernel/syscall/syscall.c
 
-X86_OBJS = $(KERNEL_SRC:.c=.x86.o) $(SCHEDULER_SRC:.c=.x86.o) $(STORAGE_SRC:.c=.x86.o) $(X86_BOOT_SRC:.S=.x86.o)
-ARM_OBJS = $(KERNEL_SRC:.c=.arm.o) $(SCHEDULER_SRC:.c=.arm.o) $(STORAGE_SRC:.c=.arm.o) $(ARM_BOOT_SRC:.S=.arm.o)
+# User program sources
+USER_LIB_SRC = user/lib/user.c
+USER_X86_BOOT_SRC = user/lib/crt0_x86.S
+USER_ARM_BOOT_SRC = user/lib/crt0_arm.S
+USER_X86_SYSCALL_SRC = user/lib/syscall_x86.S
+USER_ARM_SYSCALL_SRC = user/lib/syscall_arm.S
+USER_TEST_SRC = user/tests/hello.c
+
+USER_X86_OBJS = $(USER_LIB_SRC:.c=.user.x86.o) $(USER_TEST_SRC:.c=.user.x86.o) $(USER_X86_BOOT_SRC:.S=.user.x86.o) $(USER_X86_SYSCALL_SRC:.S=.user.x86.o)
+USER_ARM_OBJS = $(USER_LIB_SRC:.c=.user.arm.o) $(USER_TEST_SRC:.c=.user.arm.o) $(USER_ARM_BOOT_SRC:.S=.user.arm.o) $(USER_ARM_SYSCALL_SRC:.S=.user.arm.o)
+
+X86_OBJS = $(KERNEL_SRC:.c=.x86.o) $(SCHEDULER_SRC:.c=.x86.o) $(STORAGE_SRC:.c=.x86.o) \
+           $(UPDATE_SRC:.c=.x86.o) \
+           $(X86_BOOT_SRC:.S=.x86.o) $(X86_SYSCALL_SRC:.S=.x86.o) $(SYSCALL_SRC:.c=.x86.o)
+ARM_OBJS = $(KERNEL_SRC:.c=.arm.o) $(SCHEDULER_SRC:.c=.arm.o) $(STORAGE_SRC:.c=.arm.o) \
+           $(UPDATE_SRC:.c=.arm.o) \
+           $(ARM_BOOT_SRC:.S=.arm.o) $(ARM_SYSCALL_SRC:.S=.arm.o) $(SYSCALL_SRC:.c=.arm.o)
 
 X86_OUT = build/x86
 ARM_OUT = build/arm
 X86_BIN = $(X86_OUT)/lughos.bin
 ARM_BIN = $(ARM_OUT)/lughos.bin
+X86_USER_BIN = $(X86_OUT)/user_hello
+ARM_USER_BIN = $(ARM_OUT)/user_hello
+X86_USER_OBJ = $(X86_OUT)/user_hello.o
+ARM_USER_OBJ = $(ARM_OUT)/user_hello.o
 
 all: x86 arm
 
-x86: $(X86_BIN)
+x86: user_x86 $(X86_BIN) 
 
-arm: $(ARM_BIN)
+arm: user_arm $(ARM_BIN)
 
-$(X86_BIN): $(X86_OBJS)
+user_x86: $(X86_USER_BIN) $(X86_USER_OBJ)
+
+user_arm: $(ARM_USER_BIN) $(ARM_USER_OBJ)
+
+$(X86_BIN): $(X86_OBJS) $(X86_USER_OBJ)
 	@mkdir -p $(X86_OUT)
 	$(X86_LD) $(X86_LDFLAGS) -o $@ $^ $(LIBS)
 	@echo "Built x86 kernel: $@"
 	@echo "Checking binary for security issues..."
 	@objdump -d $@ | grep -i "mov.*esp.*eax" || echo "No stack exec vulnerabilities found"
 
-$(ARM_BIN): $(ARM_OBJS)
+$(ARM_BIN): $(ARM_OBJS) $(ARM_USER_OBJ)
 	@mkdir -p $(ARM_OUT)
 	$(ARM_LD) $(ARM_LDFLAGS) -o $@ $^ $(LIBS)
 	@echo "Built ARM kernel: $@"
@@ -80,8 +110,45 @@ $(ARM_BIN): $(ARM_OBJS)
 %.arm.o: %.S
 	$(ARM_CC) $(CFLAGS) -c $< -o $@
 
+# User-space object compilation
+%.user.x86.o: %.c
+	$(X86_CC) $(CFLAGS) -I. -Iuser/lib -c $< -o $@
+
+%.user.x86.o: %.S
+	$(X86_CC) $(CFLAGS) -I. -Iuser/lib -c $< -o $@
+
+%.user.arm.o: %.c
+	$(ARM_CC) $(CFLAGS) -I. -Iuser/lib -c $< -o $@
+
+%.user.arm.o: %.S
+	$(ARM_CC) $(CFLAGS) -I. -Iuser/lib -c $< -o $@
+	
+# User binaries	
+$(X86_USER_BIN): $(USER_X86_OBJS)
+	@mkdir -p $(X86_OUT)
+	$(X86_LD) -T user/linker_user_x86.ld -o $@ $^
+	@echo "Built x86 user program: $@"
+
+$(X86_USER_OBJ): $(X86_USER_BIN)
+	@echo "Creating embedded user program object..."
+	# Create raw binary first to avoid symbol conflicts
+	i686-elf-objcopy -O binary $(X86_USER_BIN) $(X86_OUT)/user_hello.bin
+	# Then convert the raw binary to an object file with proper symbols
+	i686-elf-ld -r -b binary --oformat elf32-i386 -o $(X86_OUT)/user_hello.o $(X86_OUT)/user_hello.bin
+	@echo "Symbols created: _binary_user_hello_bin_start, _binary_user_hello_bin_end"
+
+$(ARM_USER_BIN): $(USER_ARM_OBJS)
+	@mkdir -p $(ARM_OUT)
+	$(ARM_LD) -T user/linker_user_arm.ld -o $@ $^
+	@echo "Built ARM user program: $@"
+
+$(ARM_USER_OBJ): $(ARM_USER_BIN)
+	@echo "Creating embedded ARM user program object..."
+	# Use objcopy instead of ld to avoid symbol name conflicts
+	objcopy --rename-section .data=.userprogs,alloc,load,readonly,data,contents --strip-all -B arm -I binary -O elf32-littlearm $(ARM_USER_BIN) $(ARM_OUT)/user_hello.o
+
 clean:
-	rm -rf build *.o kernel/*.o kernel/*/*.o kernel/*/*/*.o services/*/*.o
+	rm -rf build *.o kernel/*.o kernel/*/*.o kernel/*/*/*.o services/*/*.o user/*.o user/*/*.o
 
 run: x86
 	@echo "Running LughOS x86 in QEMU..."

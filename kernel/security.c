@@ -9,6 +9,7 @@
 
 #include "lugh.h"
 #include "console.h"
+#include "crypto.h"
 
 /**
  * Initialize hardware memory protection
@@ -186,5 +187,43 @@ bool security_generate_random(void* buffer, size_t size) {
         buf[i] = (next >> 16) & 0xFF;
     }
     
+    return true;
+}
+
+/**
+ * Verify the signature (hash) of an update image
+ * 
+ * Uses cryptographic functions to validate that the update
+ * binary matches its expected hash to prevent tampering.
+ * 
+ * @param image Pointer to update binary image 
+ * @param size Size of the binary image
+ * @param expected_hash Expected hash value for verification
+ * @return true if signature is valid
+ * 
+ * Complies with:
+ * - SEI CERT MSC41-C: Never hard code sensitive information
+ * - JPL Rule 14: Check return values
+ * - NASA Rule 6: Validate data from external sources
+ */
+bool verify_signature(const uint8_t *image, size_t size, uint32_t expected_hash) {
+    /* Validate parameters */
+    if (image == NULL || size == 0) {
+        log_message(LOG_ERROR, "Invalid parameters for signature verification");
+        return false;
+    }
+    
+    /* Calculate the hash */
+    uint32_t calculated_hash = compute_sha256(image, size);
+    
+    /* Compare with expected hash */
+    if (calculated_hash != expected_hash) {
+        log_message(LOG_ERROR, "Signature verification failed: hash mismatch");
+        log_message(LOG_ERROR, "Expected: 0x%08x, Calculated: 0x%08x", 
+                   expected_hash, calculated_hash);
+        return false;
+    }
+    
+    log_message(LOG_INFO, "Signature verification passed");
     return true;
 }

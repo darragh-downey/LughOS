@@ -49,4 +49,14 @@ bool security_validate_memory_access(void* addr, size_t size, bool write);
  */
 bool security_generate_random(void* buffer, size_t size);
 
+/**
+ * Verify the signature (hash) of an update image
+ * 
+ * @param image Pointer to update binary image 
+ * @param size Size of the binary image
+ * @param expected_hash Expected hash value for verification
+ * @return true if signature is valid
+ */
+bool verify_signature(const uint8_t *image, size_t size, uint32_t expected_hash);
+
 #endif /* SECURITY_H */

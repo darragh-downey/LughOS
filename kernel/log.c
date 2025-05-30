@@ -1,5 +1,6 @@
 #include "lugh.h"
 #include "hardware.h"
+#include <stdint.h>
 
 
 // Function prototypes
@@ -7,6 +8,14 @@ static void init_serial(void);
 static void serial_write(uint8_t c);
 static void kputchar(char c);
 static void kprintf(const char* format, va_list args);
+
+// Simple global tick counter for timestamps
+static volatile uint32_t log_ticks = 0;
+
+// Call this from your timer interrupt handler to increment
+void log_tick(void) {
+    log_ticks++;
+}
 
 // Initialize serial port for debugging
 static void init_serial(void) {
@@ -105,9 +114,46 @@ static void kprintf(const char* format, va_list args) {
                 }
                 break;
             }
-            case 'c': {
-                int ch = va_arg(args, int);
-                kputchar((char)ch);
+            case 'u': {
+                unsigned int value = va_arg(args, unsigned int);
+                char buffer[12];
+                int i = 0;
+                do {
+                    buffer[i++] = (char)('0' + (value % 10));
+                    value /= 10;
+                } while (value && i < 11);
+                while (i > 0) {
+                    kputchar(buffer[--i]);
+                }
+                break;
+            }
+            case 'x': {
+                unsigned int value = va_arg(args, unsigned int);
+                char buffer[8];
+                int i = 0;
+                do {
+                    int digit = value & 0xF;
+                    buffer[i++] = (char)((digit < 10) ? ('0' + digit) : ('a' + digit - 10));
+                    value >>= 4;
+                } while (i < 8); // Always print 8 hex digits
+                while (i > 0) {
+                    kputchar(buffer[--i]);
+                }
+                break;
+            }
+            case 'p': {
+                unsigned int value = va_arg(args, unsigned int);
+                kputchar('0'); kputchar('x');
+                char buffer[8];
+                int i = 0;
+                do {
+                    int digit = value & 0xF;
+                    buffer[i++] = (char)((digit < 10) ? ('0' + digit) : ('a' + digit - 10));
+                    value >>= 4;
+                } while (i < 8); // Always print 8 hex digits for pointers
+                while (i > 0) {
+                    kputchar(buffer[--i]);
+                }
                 break;
             }
             case '%':
@@ -121,10 +167,25 @@ static void kprintf(const char* format, va_list args) {
 }
 
 void log_message(log_level_t level, const char* format, ...) {
-    // Fix: log_level_t is unsigned, so level < LOG_DEBUG is always false
     if ((unsigned)level >= (unsigned)LOG_LEVEL_COUNT) return;
+    // Print timestamp prefix as 8 hex digits, zero-padded
+    kputchar('[');
+    unsigned int t = log_ticks;
+    char buffer[8];
+    int i = 0;
+    do {
+        int digit = t & 0xF;
+        buffer[i++] = (char)((digit < 10) ? ('0' + digit) : ('a' + digit - 10));
+        t >>= 4;
+    } while (i < 8);
+    while (i > 0) {
+        kputchar(buffer[--i]);
+    }
+    kputchar(']');
+    kputchar(' ');
     va_list args;
     va_start(args, format);
     kprintf(format, args);
     va_end(args);
+    kputchar('\n'); // Always end log messages with a newline for clarity
 }

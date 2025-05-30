@@ -12,6 +12,7 @@ fi
 # Start QEMU with proper flags for multiboot kernel
 qemu-system-i386 \
     -kernel build/x86/lughos.bin \
+    -initrd build/x86/user_hello \
     -nographic \
     -no-reboot \
     -monitor vc \

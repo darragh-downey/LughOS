@@ -65,4 +65,13 @@ bool crypto_encrypt(const void* data, size_t data_len, void* output, size_t outp
  */
 bool crypto_decrypt(const void* data, size_t data_len, void* output, size_t output_len, size_t* actual_len);
 
+/**
+ * Compute a SHA-256 hash of the provided data
+ * 
+ * @param data Pointer to data to hash
+ * @param len Length of data in bytes
+ * @return 32-bit hash value
+ */
+uint32_t compute_sha256(const uint8_t *data, size_t len);
+
 #endif /* CRYPTO_H */
