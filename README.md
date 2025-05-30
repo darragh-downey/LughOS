@@ -89,8 +89,9 @@ LughOS uses GitHub Actions for CI/CD with the following workflows:
 - **Build Workflow**: Compiles for all supported architectures and runs basic tests
 - **Matrix Build**: Builds for multiple architectures in parallel
 - **Static Analysis**: Performs CERT C compliance checks and code quality analysis
+- **Reusable Workflow**: Provides a reusable workflow for LughOS-based projects
 
-See [CI/CD Documentation](docs/ci_cd.md) for more details.
+See [CI/CD Documentation](docs/ci_cd.md) and [CI/CD Quick Start Guide](docs/ci_cd_quickstart.md) for more details.
 
 Build both:
 

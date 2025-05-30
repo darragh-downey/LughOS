@@ -5,6 +5,12 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  actions: read
+  packages: read
+  id-token: write
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -12,7 +18,7 @@ jobs:
       cache-hit-toolchain: ${{ steps.cache-i686-elf-toolchain.outputs.cache-hit }}
       cache-hit-nng: ${{ steps.cache-nng-build.outputs.cache-hit }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Cache i686-elf toolchain
         id: cache-i686-elf-toolchain
@@ -47,13 +53,13 @@ jobs:
           sudo ldconfig
 
       - name: Upload toolchain artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: toolchain
           path: i686-elf-tools-linux
 
       - name: Upload NNG artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: nng
           path: nng/build
@@ -66,7 +72,7 @@ jobs:
       matrix:
         architecture: [x86, arm, riscv]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install common dependencies
         run: |
@@ -76,13 +82,13 @@ jobs:
           sudo apt-get install -y cmake make git qemu-system-i386 unzip
 
       - name: Download toolchain
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: toolchain
           path: i686-elf-tools-linux
 
       - name: Download NNG
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: nng
           path: nng/build
@@ -108,7 +114,7 @@ jobs:
           ./scripts/run_tests.sh || true
           
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: lughos-${{ matrix.architecture }}-build
           path: |
@@ -118,10 +124,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Download build artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
           
@@ -147,7 +153,7 @@ jobs:
           done
 
       - name: Upload test reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: test-reports

@@ -21,6 +21,12 @@ on:
         default: true
         description: 'Whether to run static analysis'
 
+permissions:
+  contents: read
+  actions: read
+  packages: read
+  id-token: write
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -29,7 +35,7 @@ jobs:
       cache-hit-nng: ${{ steps.cache-nng-build.outputs.cache-hit }}
       architectures: ${{ inputs.architectures }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Cache i686-elf toolchain
         id: cache-i686-elf-toolchain
@@ -64,13 +70,13 @@ jobs:
           sudo ldconfig
 
       - name: Upload toolchain artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: toolchain
           path: i686-elf-tools-linux
 
       - name: Upload NNG artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: nng
           path: nng/build
@@ -83,7 +89,7 @@ jobs:
       matrix:
         architecture: ${{ fromJSON(needs.setup.outputs.architectures) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install common dependencies
         run: |
@@ -93,13 +99,13 @@ jobs:
           sudo apt-get install -y cmake make git qemu-system-i386 unzip
 
       - name: Download toolchain
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: toolchain
           path: i686-elf-tools-linux
 
       - name: Download NNG
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: nng
           path: nng/build
@@ -124,7 +130,7 @@ jobs:
           ./scripts/run_tests.sh
           
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: lughos-${{ matrix.architecture }}-build
           path: |
@@ -135,7 +141,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Install dependencies
         run: |
@@ -167,7 +173,7 @@ jobs:
             reports/cppcheck-report.xml > reports/cppcheck-report.html
 
       - name: Upload analysis reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: static-analysis-reports
           path: reports/
@@ -177,10 +183,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Download build artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
@@ -221,7 +227,7 @@ jobs:
           fi
 
       - name: Upload test reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: test-logs/
