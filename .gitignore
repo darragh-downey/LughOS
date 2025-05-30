@@ -44,4 +44,4 @@ build/
 modules.order
 Module.symvers
 Mkfile.old
-dkms.conf
+dkms.confcppcheck-report.txt
