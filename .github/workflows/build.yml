@@ -54,15 +54,25 @@ jobs:
 
       - name: Build for x86
         run: make x86
+        env:
+          PATH: ${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
 
       - name: Run QEMU x86 tests
         run: ./scripts/test_x86.sh
+        env:
+          PATH: ${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
 
       - name: Build for ARM
         run: make arm
+        env:
+          PATH: ${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
 
       - name: Build for RISC-V
         run: make riscv
+        env:
+          PATH: ${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
 
       - name: Run unit tests
         run: make test
+        env:
+          PATH: ${{ github.workspace }}/i686-elf-tools-linux/bin:${{ env.PATH }}
