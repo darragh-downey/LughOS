@@ -37,6 +37,7 @@ jobs:
       - name: Run static analysis with Cppcheck
         run: |
           cppcheck --enable=all --error-exitcode=1 --suppress=missingIncludeSystem \
+            -Iinclude \
             kernel/*.c services/scheduler/*.c services/storage/*.c tests/*.c
 
       - name: Build for x86
