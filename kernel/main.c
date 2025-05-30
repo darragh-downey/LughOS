@@ -265,11 +265,14 @@ void kmain(void) {
     // Initialize crypto subsystem (depends on memory and security)
     crypto_init();
     
-#ifdef __arm__
+#if defined(__arm__)
     // Initialize ARM system call interface
     init_syscall_arm();
+#elif defined(__riscv)
+    // Initialize RISC-V system call interface
+    init_syscall_riscv();
 #else
-    // Initialize system call interface
+    // Initialize x86 system call interface
     init_syscall();
 #endif
     
@@ -294,10 +297,26 @@ void kmain(void) {
     // Check if we have a user program to load (would come from initrd or filesystem)
     // Using the symbols created by objcopy
     // Binary symbols created by ld (using -b binary)
+#if defined(__i386__) || defined(__x86_64__)
     extern char _binary_build_x86_user_hello_bin_start[];
     extern char _binary_build_x86_user_hello_bin_end[];
     void* binary_start = (void*)_binary_build_x86_user_hello_bin_start;
     void* binary_end = (void*)_binary_build_x86_user_hello_bin_end;
+#elif defined(__arm__)
+    extern char _binary_build_arm_user_hello_bin_start[];
+    extern char _binary_build_arm_user_hello_bin_end[];
+    void* binary_start = (void*)_binary_build_arm_user_hello_bin_start;
+    void* binary_end = (void*)_binary_build_arm_user_hello_bin_end;
+#elif defined(__riscv)
+    extern char _binary_build_riscv_user_hello_bin_start[];
+    extern char _binary_build_riscv_user_hello_bin_end[];
+    void* binary_start = (void*)_binary_build_riscv_user_hello_bin_start;
+    void* binary_end = (void*)_binary_build_riscv_user_hello_bin_end;
+#else
+    #error "Unsupported architecture"
+    void* binary_start = NULL;
+    void* binary_end = NULL;
+#endif
     
     if (binary_start != NULL && binary_end != NULL) {
         size_t size = (size_t)((uintptr_t)binary_end - (uintptr_t)binary_start);

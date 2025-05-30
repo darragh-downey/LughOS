@@ -44,6 +44,13 @@ run_unit_test() {
                     return 1
                 }
                 ;;
+            riscv)
+                qemu-system-riscv64 -machine virt -cpu rv64 -kernel "${test_bin}" -nographic -no-reboot -serial stdio -display none >> "${test_log}" 2>&1 || {
+                    echo -e "${RED}✗ Test ${test_name} failed${NC}"
+                    echo "RESULT: FAILED" >> "${test_log}"
+                    return 1
+                }
+                ;;
             *)
                 echo -e "${RED}Unknown architecture: ${ARCH}${NC}"
                 return 1
