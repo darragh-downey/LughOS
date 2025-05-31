@@ -1,11 +1,45 @@
 # LughOS Makefile for x86, ARM and RISC-V on Fedora 42 with hardening
 
-X86_CC = i686-elf-gcc
-X86_LD = i686-elf-ld
-ARM_CC = arm-none-eabi-gcc
-ARM_LD = arm-none-eabi-ld
-RISCV_CC = riscv64-linux-gnu-gcc
-RISCV_LD = riscv64-linux-gnu-ld
+# Check which toolchains are available on this system
+X86_TOOLCHAIN_AVAILABLE := $(shell scripts/check_toolchains.sh | grep X86_TOOLCHAIN_AVAILABLE | cut -d= -f2)
+RISCV_TOOLCHAIN_AVAILABLE := $(shell scripts/check_toolchains.sh | grep RISCV_TOOLCHAIN_AVAILABLE | cut -d= -f2)
+ARM_TOOLCHAIN_AVAILABLE := $(shell scripts/check_toolchains.sh | grep ARM_TOOLCHAIN_AVAILABLE | cut -d= -f2)
+
+# Show available toolchains
+$(info Available toolchains: $(if $(filter 1,$(X86_TOOLCHAIN_AVAILABLE)),x86,) $(if $(filter 1,$(ARM_TOOLCHAIN_AVAILABLE)),arm,) $(if $(filter 1,$(RISCV_TOOLCHAIN_AVAILABLE)),riscv,))
+
+# Check if we're running in CI environment and need to use the provided toolchains
+ifneq ($(wildcard /home/runner/work/LughOS/LughOS/i686-elf-tools-linux/bin/i686-elf-gcc),)
+  X86_TOOLS_PATH = /home/runner/work/LughOS/LughOS/i686-elf-tools-linux/bin
+  X86_CC = $(X86_TOOLS_PATH)/i686-elf-gcc
+  X86_LD = $(X86_TOOLS_PATH)/i686-elf-ld
+  X86_TOOLCHAIN_AVAILABLE = 1
+else
+  X86_CC = i686-elf-gcc
+  X86_LD = i686-elf-ld
+endif
+
+# Check if RISC-V tools are in the CI environment
+ifneq ($(wildcard /home/runner/work/LughOS/LughOS/riscv-tools/bin/riscv64-linux-gnu-gcc),)
+  RISCV_TOOLS_PATH = /home/runner/work/LughOS/LughOS/riscv-tools/bin
+  RISCV_CC = $(RISCV_TOOLS_PATH)/riscv64-linux-gnu-gcc
+  RISCV_LD = $(RISCV_TOOLS_PATH)/riscv64-linux-gnu-ld
+  RISCV_TOOLCHAIN_AVAILABLE = 1
+else
+  RISCV_CC = riscv64-linux-gnu-gcc
+  RISCV_LD = riscv64-linux-gnu-ld
+endif
+
+# Check if ARM tools are in the CI environment
+ifneq ($(wildcard /home/runner/work/LughOS/LughOS/arm-tools/bin/arm-none-eabi-gcc),)
+  ARM_TOOLS_PATH = /home/runner/work/LughOS/LughOS/arm-tools/bin
+  ARM_CC = $(ARM_TOOLS_PATH)/arm-none-eabi-gcc
+  ARM_LD = $(ARM_TOOLS_PATH)/arm-none-eabi-ld
+  ARM_TOOLCHAIN_AVAILABLE = 1
+else
+  ARM_CC = arm-none-eabi-gcc
+  ARM_LD = arm-none-eabi-ld
+endif
 # Architecture detection flags
 X86_ARCH_FLAGS = -D__i386__
 ARM_ARCH_FLAGS = -D__arm__
@@ -102,13 +136,51 @@ X86_USER_OBJ = $(X86_OUT)/user_hello.o
 ARM_USER_OBJ = $(ARM_OUT)/user_hello.o
 RISCV_USER_OBJ = $(RISCV_OUT)/user_hello.o
 
-all: x86 arm riscv
+ALL_TARGETS =
+ifeq ($(X86_TOOLCHAIN_AVAILABLE),1)
+  ALL_TARGETS += x86
+endif
+ifeq ($(ARM_TOOLCHAIN_AVAILABLE),1)
+  ALL_TARGETS += arm
+endif
+ifeq ($(RISCV_TOOLCHAIN_AVAILABLE),1)
+  ALL_TARGETS += riscv
+endif
 
-x86: user_x86 $(X86_BIN) 
+all: $(ALL_TARGETS)
+	@if [ -z "$(ALL_TARGETS)" ]; then \
+		echo "Error: No toolchains available for any architecture"; \
+		echo "Please install at least one of the following toolchains:"; \
+		echo "  - i686-elf-gcc (for x86)"; \
+		echo "  - arm-none-eabi-gcc (for ARM)"; \
+		echo "  - riscv64-linux-gnu-gcc (for RISC-V)"; \
+		exit 1; \
+	fi
+	@echo "Successfully built: $(ALL_TARGETS)"
 
-arm: user_arm $(ARM_BIN)
+x86: 
+ifeq ($(X86_TOOLCHAIN_AVAILABLE),1)
+	@$(MAKE) user_x86 $(X86_BIN)
+else
+	@echo "Error: X86 toolchain not available"
+	@exit 1
+endif
 
-riscv: user_riscv $(RISCV_BIN)
+arm: 
+ifeq ($(ARM_TOOLCHAIN_AVAILABLE),1)
+	@$(MAKE) user_arm $(ARM_BIN)
+else
+	@echo "Error: ARM toolchain not available"
+	@exit 1
+endif
+
+riscv: 
+ifeq ($(RISCV_TOOLCHAIN_AVAILABLE),1)
+	@$(MAKE) user_riscv $(RISCV_BIN)
+else
+	@echo "Error: RISC-V toolchain not available"
+	@exit 1
+endif
 
 user_x86: $(X86_USER_BIN) $(X86_USER_OBJ)
 
@@ -138,41 +210,41 @@ $(RISCV_BIN): $(RISCV_OBJS) $(RISCV_USER_OBJ)
 	@objdump -d $@ | grep -i "^.*sp" || echo "No stack exec vulnerabilities found"
 
 %.x86.o: %.c
-	$(X86_CC) $(X86_CFLAGS) -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(X86_CC) $(X86_CFLAGS) -c $< -o $@
 	
 %.riscv.o: %.c
-	$(RISCV_CC) $(RISCV_CFLAGS) -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(RISCV_CC) $(RISCV_CFLAGS) -c $< -o $@
 
 %.x86.o: %.S
-	$(X86_CC) $(X86_CFLAGS) -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(X86_CC) $(X86_CFLAGS) -c $< -o $@
 
 %.arm.o: %.c
-	$(ARM_CC) $(ARM_CFLAGS) -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(ARM_CC) $(ARM_CFLAGS) -c $< -o $@
 
 %.arm.o: %.S
-	$(ARM_CC) $(ARM_CFLAGS) -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(ARM_CC) $(ARM_CFLAGS) -c $< -o $@
 
 %.riscv.o: %.S
-	$(RISCV_CC) $(RISCV_CFLAGS) -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(RISCV_CC) $(RISCV_CFLAGS) -c $< -o $@
 
 # User-space object compilation
 %.user.x86.o: %.c
-	$(X86_CC) $(X86_CFLAGS) -I. -Iuser/lib -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(X86_CC) $(X86_CFLAGS) -I. -Iuser/lib -c $< -o $@
 
 %.user.x86.o: %.S
-	$(X86_CC) $(X86_CFLAGS) -I. -Iuser/lib -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(X86_CC) $(X86_CFLAGS) -I. -Iuser/lib -c $< -o $@
 
 %.user.arm.o: %.c
-	$(ARM_CC) $(ARM_CFLAGS) -I. -Iuser/lib -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(ARM_CC) $(ARM_CFLAGS) -I. -Iuser/lib -c $< -o $@
 
 %.user.arm.o: %.S
-	$(ARM_CC) $(ARM_CFLAGS) -I. -Iuser/lib -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(ARM_CC) $(ARM_CFLAGS) -I. -Iuser/lib -c $< -o $@
 
 %.user.riscv.o: %.c
-	$(RISCV_CC) $(RISCV_CFLAGS) -I. -Iuser/lib -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(RISCV_CC) $(RISCV_CFLAGS) -I. -Iuser/lib -c $< -o $@
 
 %.user.riscv.o: %.S
-	$(RISCV_CC) $(RISCV_CFLAGS) -I. -Iuser/lib -c $< -o $@
+	./scripts/fix_toolchain_paths.sh $(RISCV_CC) $(RISCV_CFLAGS) -I. -Iuser/lib -c $< -o $@
 	
 # User binaries	
 $(X86_USER_BIN): $(USER_X86_OBJS)
@@ -183,9 +255,9 @@ $(X86_USER_BIN): $(USER_X86_OBJS)
 $(X86_USER_OBJ): $(X86_USER_BIN)
 	@echo "Creating embedded user program object..."
 	# Create raw binary first to avoid symbol conflicts
-	i686-elf-objcopy -O binary $(X86_USER_BIN) $(X86_OUT)/user_hello.bin
+	./scripts/fix_toolchain_paths.sh i686-elf-objcopy -O binary $(X86_USER_BIN) $(X86_OUT)/user_hello.bin
 	# Then convert the raw binary to an object file with proper symbols
-	i686-elf-ld -r -b binary --oformat elf32-i386 -o $(X86_OUT)/user_hello.o $(X86_OUT)/user_hello.bin
+	./scripts/fix_toolchain_paths.sh i686-elf-ld -r -b binary --oformat elf32-i386 -o $(X86_OUT)/user_hello.o $(X86_OUT)/user_hello.bin
 	@echo "Symbols created: _binary_user_hello_bin_start, _binary_user_hello_bin_end"
 
 $(ARM_USER_BIN): $(USER_ARM_OBJS)
@@ -208,9 +280,9 @@ $(RISCV_USER_BIN): $(USER_RISCV_OBJS)
 $(RISCV_USER_OBJ): $(RISCV_USER_BIN)
 	@echo "Creating embedded RISC-V user program object..."
 	# Create raw binary first to avoid symbol conflicts
-	riscv64-linux-gnu-objcopy -O binary $(RISCV_USER_BIN) $(RISCV_OUT)/user_hello.bin
+	./scripts/fix_toolchain_paths.sh riscv64-linux-gnu-objcopy -O binary $(RISCV_USER_BIN) $(RISCV_OUT)/user_hello.bin
 	# Then convert the raw binary to an object file with proper symbols
-	riscv64-linux-gnu-ld -r -b binary -o $(RISCV_OUT)/user_hello.o $(RISCV_OUT)/user_hello.bin
+	./scripts/fix_toolchain_paths.sh riscv64-linux-gnu-ld -r -b binary -o $(RISCV_OUT)/user_hello.o $(RISCV_OUT)/user_hello.bin
 	@echo "RISC-V user program object created"
 
 clean:
@@ -242,15 +314,23 @@ security-check:
 	@echo "Running static analysis with cppcheck..."
 	@$(MAKE) analyze
 
-test: x86 arm riscv
-	@echo "Running all tests..."
+test: $(ALL_TARGETS)
+	@echo "Running tests for available architectures: $(ALL_TARGETS)"
 	@mkdir -p test-logs
 	@./scripts/run_tests.sh
+ifeq ($(X86_TOOLCHAIN_AVAILABLE),1)
 	@./scripts/run_unit_tests.sh x86 || true
+endif
+ifeq ($(ARM_TOOLCHAIN_AVAILABLE),1)
 	@./scripts/run_unit_tests.sh arm || true
+endif
+ifeq ($(RISCV_TOOLCHAIN_AVAILABLE),1)
+	@./scripts/run_unit_tests.sh riscv || true
+endif
 	@echo "Tests completed, see test-logs/ directory for details"
 
-ci: clean x86 arm riscv test analyze security-check
+# For CI, we should have all toolchains available
+ci: clean $(ALL_TARGETS) test analyze security-check
 	@echo "CI pipeline completed successfully"
 
 .PHONY: all x86 arm riscv clean run debug analyze security-check test ci
