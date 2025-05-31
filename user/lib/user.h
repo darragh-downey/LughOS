@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>  /* For uintptr_t */
 
 /* System call numbers */
 #define SYS_WRITE    1

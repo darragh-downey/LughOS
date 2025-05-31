@@ -19,14 +19,17 @@ uint8_t inb(uint16_t port) {
     return ret;
 }
 #else
-// On non-x86 (e.g., ARM), these are not supported. Provide stubs.
+// On non-x86 architectures, these are not supported directly.
+// For RISC-V and ARM, we'll use a memory-mapped approach implemented
+// in the architecture-specific console files.
 void outb(uint16_t port, uint8_t val) {
     (void)port; (void)val;
-    // Optionally log or ignore
+    // These are implemented architecture-specifically
 }
 
 uint8_t inb(uint16_t port) {
     (void)port;
+    // These are implemented architecture-specifically
     return 0;
 }
 #endif

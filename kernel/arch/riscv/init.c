@@ -20,10 +20,13 @@ int init_riscv(void) {
 
 /**
  * Initialize RISC-V system call interface
+ * This function only logs the initialization, the actual setup is in syscall.S
  */
-void init_syscall_riscv(void) {
+void init_syscall_riscv_c(void) {
     log_message(LOG_INFO, "Initializing RISC-V system call interface...\n");
-    // The actual initialization happens in syscall.S
+    // The actual initialization happens in syscall.S through init_syscall_riscv
     
-    // Any additional C-based setup can go here
+    // Call the assembly implementation
+    extern void init_syscall_riscv(void);
+    init_syscall_riscv();
 }

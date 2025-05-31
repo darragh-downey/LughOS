@@ -40,7 +40,13 @@ void syscall_handler(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3) 
             }
             
             // Write to console
+#ifdef __riscv
+            // Use uintptr_t for RISC-V (64-bit)
+            console_write((const char*)(uintptr_t)arg1, arg2);
+#else
+            // Original 32-bit implementation
             console_write((const char*)arg1, arg2);
+#endif
             break;
             
         case SYS_IPC_SEND:
@@ -58,7 +64,13 @@ void syscall_handler(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3) 
             }
             
             // Process IPC message
+#ifdef __riscv
+            // Use uintptr_t for RISC-V (64-bit)
+            message_t* msg = (message_t*)(uintptr_t)arg2;
+#else
+            // Original 32-bit implementation
             message_t* msg = (message_t*)arg2;
+#endif
             msg->operation = arg1;  // Set operation from arg1
             
             // Ensure null-termination (SEI CERT STR31-C)

@@ -1,9 +1,9 @@
 /* RISC-V User Mode Switching Code for LughOS */
 
 .section .text
-.global switch_to_user_mode
+.global enter_user_mode
 
-switch_to_user_mode:
+enter_user_mode:
     /* a0 = user program entry point, a1 = user stack pointer */
     
     /* Set USER mode and enable interrupts */

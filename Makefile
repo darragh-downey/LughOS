@@ -54,7 +54,8 @@ COMMON_CFLAGS = -ffreestanding -nostdlib -Wall -Wextra -Werror -Wformat=2 -Wform
 
 X86_CFLAGS = $(COMMON_CFLAGS) $(X86_ARCH_FLAGS)
 ARM_CFLAGS = $(COMMON_CFLAGS) $(ARM_ARCH_FLAGS)
-RISCV_CFLAGS = $(COMMON_CFLAGS) $(RISCV_ARCH_FLAGS)
+# Disable conversion warnings for RISC-V due to pointer size differences
+RISCV_CFLAGS = $(COMMON_CFLAGS) $(RISCV_ARCH_FLAGS) -Wno-conversion
 # commented out for the time being -fstack-protector-strong
 # Comment out for now as it's incompatible with our cross-compiler
 # LIBS = lib/nng/lib/libnng.a
@@ -84,7 +85,7 @@ KERNEL_COMMON_SRC = \
 # Architecture-specific kernel sources
 X86_SPECIFIC_SRC = kernel/arch/x86/init.c
 ARM_SPECIFIC_SRC = kernel/arch/arm/init.c
-RISCV_SPECIFIC_SRC = kernel/arch/riscv/init.c
+RISCV_SPECIFIC_SRC = kernel/arch/riscv/init.c kernel/arch/riscv/syscall_handler.c kernel/arch/riscv/console.c kernel/arch/riscv/early_debug.c
 
 KERNEL_SRC = $(KERNEL_COMMON_SRC)
 

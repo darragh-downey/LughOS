@@ -5,7 +5,8 @@ ENTRY(_start)
 
 SECTIONS
 {
-	. = 0x80000000;
+	/* Start at 0x80100000 to avoid conflicting with OpenSBI firmware */
+	. = 0x80100000;
 	
 	.text : ALIGN(4K)
 	{
@@ -25,8 +26,10 @@ SECTIONS
 	
 	.bss : ALIGN(4K)
 	{
+		PROVIDE(__bss_start = .);
 		*(COMMON)
 		*(.bss)
+		PROVIDE(__bss_end = .);
 	}
 	
 	/* Add a section for stack to make sure it's properly aligned and sized */

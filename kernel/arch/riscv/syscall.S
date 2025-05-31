@@ -39,8 +39,16 @@ trap_vector:
 handle_syscall:
     /* Get syscall number from a7 and dispatch */
     ld a7, 11*8(sp)   /* Restore original a7 value (syscall number) */
+    ld a0, 4*8(sp)    /* Restore original a0 value (arg1) */
+    ld a1, 5*8(sp)    /* Restore original a1 value (arg2) */
+    ld a2, 6*8(sp)    /* Restore original a2 value (arg3) */
     
-    /* Call the C handler with args already in a0-a6 */
+    /* Call the C handler with args already in registers */
+    mv a3, a2         /* Move arg3 to a3 */
+    mv a2, a1         /* Move arg2 to a2 */
+    mv a1, a0         /* Move arg1 to a1 */
+    mv a0, a7         /* Move syscall number to a0 */
+    
     call handle_syscall_c
     
     /* Store result back to a0 for user mode */

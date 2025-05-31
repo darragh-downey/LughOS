@@ -7,7 +7,7 @@
 #define SYS_EXIT     3    /* Exit program */
 
 /* Only for kernel use */
-#ifdef __KERNEL__
+#if defined(__KERNEL__) || defined(__riscv)
 void syscall_handler(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 #endif
 

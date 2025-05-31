@@ -2,6 +2,10 @@
 #include "hardware.h"
 #include <stdint.h>
 
+// Include debug headers for early boot on RISC-V
+#ifdef __riscv
+#include "main_debug.h"
+#endif
 
 // Function prototypes
 static void init_serial(void);
@@ -168,6 +172,12 @@ static void kprintf(const char* format, va_list args) {
 
 void log_message(log_level_t level, const char* format, ...) {
     if ((unsigned)level >= (unsigned)LOG_LEVEL_COUNT) return;
+    
+#ifdef __riscv
+    // For RISC-V, provide early debug output
+    early_debug_print("[LOG] ");
+#endif
+    
     // Print timestamp prefix as 8 hex digits, zero-padded
     kputchar('[');
     unsigned int t = log_ticks;
@@ -188,4 +198,9 @@ void log_message(log_level_t level, const char* format, ...) {
     kprintf(format, args);
     va_end(args);
     kputchar('\n'); // Always end log messages with a newline for clarity
+    
+#ifdef __riscv
+    // Additional newline for RISC-V console readability
+    early_debug_print("\r\n");
+#endif
 }

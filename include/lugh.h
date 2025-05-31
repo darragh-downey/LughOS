@@ -158,6 +158,7 @@ void switch_to_user_mode(uint32_t user_eip, uint32_t user_esp);
 /* Initialize system call mechanism */
 void init_syscall(void);
 void init_syscall_arm(void);
+void init_syscall_riscv_c(void);
 
 /* System call definitions */
 #define SYS_WRITE    1    /* Write to console */

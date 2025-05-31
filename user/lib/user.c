@@ -7,7 +7,13 @@
  * @param len Length of data to write
  */
 void write(const char* buf, size_t len) {
+#ifdef __riscv
+    // Use uintptr_t for RISC-V (64-bit)
+    syscall(SYS_WRITE, (uintptr_t)buf, (uint32_t)len, 0);
+#else
+    // Original 32-bit implementation
     syscall(SYS_WRITE, (uint32_t)buf, len, 0);
+#endif
 }
 
 /**
@@ -59,7 +65,13 @@ void* memcpy(void* dest, const void* src, size_t n) {
  * @param code Exit status code
  */
 void exit(int code) {
+#ifdef __riscv
+    // Use proper casting for RISC-V
     syscall(SYS_EXIT, (uint32_t)code, 0, 0);
+#else
+    // Original implementation
+    syscall(SYS_EXIT, (uint32_t)code, 0, 0);
+#endif
     // Should not return
     while (1) {}
 }
@@ -87,7 +99,13 @@ int send_ipc(uint32_t operation, const char* message) {
     // Checksum will be calculated by kernel
     
     // Send message
+#ifdef __riscv
+    // Use uintptr_t for RISC-V (64-bit)
+    syscall(SYS_IPC_SEND, operation, (uintptr_t)&msg, 0);
+#else
+    // Original 32-bit implementation
     syscall(SYS_IPC_SEND, operation, (uint32_t)&msg, 0);
+#endif
     
     return 0;
 }

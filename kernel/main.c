@@ -8,6 +8,7 @@
 #include "update.h"
 #include "sandbox.h"
 #include "memory.h"
+#include "main_debug.h"
 
 // Forward declarations
 void test_nng(void);
@@ -244,6 +245,12 @@ void test_update_system(void) {
  * - JPL Rule 15: Validate parameters before use
  */
 void kmain(void) {
+    // For RISC-V, provide more early debug output
+#ifdef __riscv
+    early_debug_print("[RISC-V] kmain() starting\r\n");
+    early_debug_print("[RISC-V] About to call log_message...\r\n");
+#endif
+
     // Initialize essential kernel subsystems
     log_message(LOG_INFO, "%s v%s booting...\n", OS_NAME, OS_VERSION);
     
@@ -270,7 +277,7 @@ void kmain(void) {
     init_syscall_arm();
 #elif defined(__riscv)
     // Initialize RISC-V system call interface
-    init_syscall_riscv();
+    init_syscall_riscv_c();
 #else
     // Initialize x86 system call interface
     init_syscall();

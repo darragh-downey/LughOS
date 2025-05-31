@@ -5,6 +5,7 @@
 #include <sandbox.h>
 #include "assert.h"
 #include "memory.h"
+#include <stdint.h>  /* For uintptr_t */
 
 #ifndef USER_READ
 #define USER_READ  0x04
@@ -100,7 +101,13 @@ bool sandbox_apply(const uint8_t *image, size_t size) {
     
     // Copy the binary to sandbox memory
     // In a real system, this would map to the appropriate physical pages
+#ifdef __riscv
+    // Use uintptr_t for RISC-V (64-bit)
+    k_memcpy((void*)(uintptr_t)sandbox_code_addr, image, size);
+#else
+    // Original 32-bit implementation
     k_memcpy((void*)sandbox_code_addr, image, size);
+#endif
     
     // Execute the binary in the sandbox with restricted permissions
     log_message(LOG_INFO, "Executing update in sandbox environment");

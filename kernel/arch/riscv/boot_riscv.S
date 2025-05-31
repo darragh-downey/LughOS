@@ -4,6 +4,9 @@
 .global _start
 .global _riscv_boot
 
+/* External declaration for early debug function */
+.extern riscv_early_boot_debug
+
 _start:
     /* Setup the early stack pointer */
     la sp, _stack_top
@@ -18,6 +21,9 @@ _start:
     j 1b
 
 2:
+    /* Call early debug to help troubleshoot boot process */
+    call riscv_early_boot_debug
+    
     /* Jump to C kernel entry point */
     call kmain
 

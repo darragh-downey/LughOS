@@ -18,6 +18,8 @@ qemu-system-riscv64 \
     -kernel build/riscv/lughos.bin \
     -nographic \
     -no-reboot \
-    -serial stdio
+    -bios none \
+    -monitor null \
+    -serial mon:stdio
 
 echo "QEMU RISC-V session ended."
